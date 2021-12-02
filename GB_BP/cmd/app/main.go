@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	cfg "github.com/Deny7676yar/Go_level2/GB_BP/internal/config"
 	crawler2 "github.com/Deny7676yar/Go_level2/GB_BP/internal/crawler"
 	"github.com/Deny7676yar/Go_level2/GB_BP/internal/services"
 	log "github.com/sirupsen/logrus"
-	cfg "github.com/Deny7676yar/Go_level2/GB_BP/internal/config"
 	"os"
 	"os/signal"
 	"sync"
@@ -14,6 +14,13 @@ import (
 )
 
 func main() {
+
+	//Используем JSON формат для вывода
+	log.SetFormatter(&log.JSONFormatter{})
+
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.DebugLevel)
+
 	//Обьявляем поле с информациеей о стартее
 	log.WithFields(log.Fields{
 		"Start crawler": time.Now(),
@@ -23,7 +30,7 @@ func main() {
 		MaxDepth:   3,
 		MaxResults: 10,
 		MaxErrors:  5,
-		Url:        "https://telegram.org",
+		URL:        "https://telegram.org",
 		Timeout:    10,
 	}
 	var cr crawler2.Crawler
@@ -46,14 +53,18 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(cfg.Timeout))//общий таймаут в секундах
 
-	go cr.Scan(ctx, wg, cfg.Url, cfg.MaxDepth) //Запускаем краулер в отдельной рутине
+	go cr.Scan(ctx, wg, cfg.URL, cfg.MaxDepth) //Запускаем краулер в отдельной рутине
+	wg.Wait()
+	log.WithFields(log.Fields{
+		"Wait ": "cancel crawler",
+	}).Info()
 
 	go crawler2.ProcessResult(ctx, cancel, cr, cfg) //Обрабатываем результаты в отдельной рутине
 
 	crawler := crawler2.SearchDepthCrawler(cfg.MaxDepth)
 	go crawler2.SigDepth(ctx, crawler, 2)
 
-	sigCh := make(chan os.Signal)        //Создаем канал для приема сигналов
+	sigCh := make(chan os.Signal, 1)        //Создаем канал для приема сигналов
 	signal.Notify(sigCh, syscall.SIGINT) //Подписываемся на сигнал SIGINT
 
 	for {
@@ -67,11 +78,5 @@ func main() {
 			cancel() //Если пришёл сигнал SigInt - завершаем контекст
 		}
 	}
-
-	wg.Wait()
-
-	log.WithFields(log.Fields{
-		"Wait ": "cancel crawler",
-	}).Info()
-
 }
+

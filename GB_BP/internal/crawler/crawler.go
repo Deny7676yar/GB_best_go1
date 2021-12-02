@@ -2,16 +2,17 @@ package crawler
 
 import (
 	"context"
-	cfg "github.com/Deny7676yar/Go_level2/GB_BP/internal/config"
-	cra "github.com/Deny7676yar/Go_level2/GB_BP/internal/controllers/crawlerer"
-	"github.com/Deny7676yar/Go_level2/GB_BP/internal/services"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
-)
 
+	"github.com/Deny7676yar/Go_level2/GB_BP/internal/services"
+
+	cfg "github.com/Deny7676yar/Go_level2/GB_BP/internal/config"
+	cra "github.com/Deny7676yar/Go_level2/GB_BP/internal/controllers/crawlerer"
+	log "github.com/sirupsen/logrus"
+)
 
 //Crawler - интерфейс (контракт) краулера
 type Crawler interface {
@@ -19,14 +20,12 @@ type Crawler interface {
 	ChanResult() <-chan cra.CrawlResult
 }
 
-
-
 type crawler struct {
-	r   services.Requester
-	res chan cra.CrawlResult
-	visited map[string]struct{}
-	mu           sync.RWMutex
-	searchDepth     int
+	r           services.Requester
+	res         chan cra.CrawlResult
+	visited     map[string]struct{}
+	mu          sync.RWMutex
+	searchDepth int
 }
 
 func NewCrawler(r services.Requester) *crawler {
@@ -67,7 +66,7 @@ func (c *crawler) Scan(ctx context.Context, wg *sync.WaitGroup, url string, dept
 		c.mu.Unlock()
 		c.res <- cra.CrawlResult{ //Отправляем результаты в канал
 			Title: page.GetTitle(),
-			Url:   url,
+			URL:   url,
 		}
 		for _, link := range page.GetLinks() {
 			go c.Scan(ctx, wg, link, depth-1) //На все полученные ссылки запускаем новую рутину сборки
@@ -78,18 +77,6 @@ func (c *crawler) Scan(ctx context.Context, wg *sync.WaitGroup, url string, dept
 func (c *crawler) ChanResult() <-chan cra.CrawlResult {
 	return c.res
 }
-
-
-
-func init(){
-	//Используем JSON формат для вывода
-	log.SetFormatter(&log.JSONFormatter{})
-
-	log.SetOutput(os.Stdout)
-	log.SetLevel(log.DebugLevel)
-}
-
-
 
 func SearchDepthCrawler(maxDepth int) *crawler {
 	return &crawler{
@@ -119,7 +106,7 @@ func (c *crawler) InitDepth(dep int) {
 	c.mu.Unlock()
 }
 
-func ProcessResult(ctx context.Context, cancel func(), cr Crawler, cfg cfg.Config){
+func ProcessResult(ctx context.Context, cancel func(), cr Crawler, cfg cfg.Config) {
 	var maxResult, maxErrors = cfg.MaxResults, cfg.MaxErrors
 	for {
 		select {
@@ -135,7 +122,7 @@ func ProcessResult(ctx context.Context, cancel func(), cr Crawler, cfg cfg.Confi
 				}
 			} else {
 				maxResult--
-				log.Printf("crawler result: [url: %s] Title: %s\n", msg.Url, msg.Title)
+				log.Printf("crawler result: [url: %s] Title: %s\n", msg.URL, msg.Title)
 				if maxResult <= 0 {
 					cancel()
 					return

@@ -1,9 +1,11 @@
 package page
 
 import (
-	"github.com/PuerkitoBio/goquery"
-	log "github.com/sirupsen/logrus"
 	"io"
+
+	"github.com/PuerkitoBio/goquery"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Page interface {
@@ -24,7 +26,6 @@ func NewPage(raw io.Reader) (Page, error) {
 }
 
 func (p *page) GetTitle() string {
-
 	str := p.doc.Find("title").First().Text()
 
 	log.WithFields(log.Fields{

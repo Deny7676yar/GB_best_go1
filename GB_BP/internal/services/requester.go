@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
-	"github.com/Deny7676yar/Go_level2/GB_BP/internal/page"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
+
+	"github.com/Deny7676yar/Go_level2/GB_BP/internal/page"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Requester interface {
@@ -28,7 +30,7 @@ func (r requester) Get(ctx context.Context, url string) (page.Page, error) {
 		cl := &http.Client{
 			Timeout: r.timeout,
 		}
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequest("GET", url, nil) //nolint
 		if err != nil {
 			return nil, err
 		}
@@ -41,15 +43,13 @@ func (r requester) Get(ctx context.Context, url string) (page.Page, error) {
 		}
 		defer body.Body.Close()
 
-		page, err := page.NewPage(body.Body)
+		newPage, err := page.NewPage(body.Body)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"NewPage:": err,
 			}).Panicf("No Page")
 			return nil, err
 		}
-		return page, nil
+		return newPage, nil
 	}
-	return nil, nil
 }
-

@@ -5,6 +5,6 @@ type Config struct {
 	MaxDepth   int
 	MaxResults int
 	MaxErrors  int
-	Url        string
+	URL        string
 	Timeout    int //in seconds
 }

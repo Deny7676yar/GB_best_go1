@@ -2,10 +2,11 @@ package crawlerer
 
 import (
 	"context"
+	"sync"
 )
 
 type Crawler interface {
-	Scan(ctx context.Context, url string, parentUrl string, maxDepth *int64, depth int64)
+	Scan(ctx context.Context, wg *sync.WaitGroup, url string, depth int)
 	ChanResult() <-chan CrawlResult
 	ToChanResult(CrawlResult)
 }
@@ -23,5 +24,5 @@ type CrawlResult struct {
 	Err   error
 	Info  string
 	Title string
-	Url   string
+	URL   string
 }
