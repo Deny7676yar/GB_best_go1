@@ -2,16 +2,15 @@ package main
 
 import (
 	"context"
+	"github.com/PuerkitoBio/goquery"
+	log "github.com/sirupsen/logrus"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
 type CrawlResult struct {
@@ -32,13 +31,20 @@ type page struct {
 func NewPage(raw io.Reader) (Page, error) {
 	doc, err := goquery.NewDocumentFromReader(raw)
 	if err != nil {
-		return nil, err
+		log.Error(err)
 	}
 	return &page{doc: doc}, nil
 }
 
 func (p *page) GetTitle() string {
-	return p.doc.Find("title").First().Text()
+
+	str := p.doc.Find("title").First().Text()
+
+	log.WithFields(log.Fields{
+		"GetTitle": str,
+	}).Info("get title")
+
+	return str
 }
 
 func (p *page) GetLinks() []string {
@@ -47,6 +53,9 @@ func (p *page) GetLinks() []string {
 		url, ok := s.Attr("href")
 		if ok {
 			urls = append(urls, url)
+			log.WithFields(log.Fields{
+				"Get body:": urls,
+			}).Info("all urls")
 		}
 	})
 	return urls
@@ -78,11 +87,18 @@ func (r requester) Get(ctx context.Context, url string) (Page, error) {
 		}
 		body, err := cl.Do(req)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"Get body:": err,
+			}).Errorf("Do Not body")
 			return nil, err
 		}
 		defer body.Body.Close()
+
 		page, err := NewPage(body.Body)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"NewPage:": err,
+			}).Panicf("No Page")
 			return nil, err
 		}
 		return page, nil
@@ -92,15 +108,18 @@ func (r requester) Get(ctx context.Context, url string) (Page, error) {
 
 //Crawler - интерфейс (контракт) краулера
 type Crawler interface {
-	Scan(ctx context.Context, url string, depth int)
+	Scan(ctx context.Context, wg *sync.WaitGroup, url string, depth int)
 	ChanResult() <-chan CrawlResult
 }
+
+
 
 type crawler struct {
 	r       Requester
 	res     chan CrawlResult
 	visited map[string]struct{}
-	mu      sync.RWMutex
+	mu           sync.RWMutex
+	searchDepth     int
 }
 
 func NewCrawler(r Requester) *crawler {
@@ -112,8 +131,13 @@ func NewCrawler(r Requester) *crawler {
 	}
 }
 
-func (c *crawler) Scan(ctx context.Context, url string, depth int) {
-	if depth <= 0 { //Проверяем то, что есть запас по глубине
+func (c *crawler) Scan(ctx context.Context, wg *sync.WaitGroup, url string, depth int) {
+	//if depth <= 0 { //Проверяем то, что есть запас по глубине
+	//	return
+	//}
+
+	defer wg.Done()
+	if depth >= c.searchDepth {
 		return
 	}
 	c.mu.RLock()
@@ -139,7 +163,7 @@ func (c *crawler) Scan(ctx context.Context, url string, depth int) {
 			Url:   url,
 		}
 		for _, link := range page.GetLinks() {
-			go c.Scan(ctx, link, depth-1) //На все полученные ссылки запускаем новую рутину сборки
+			go c.Scan(ctx, wg, link, depth-1) //На все полученные ссылки запускаем новую рутину сборки
 		}
 	}
 }
@@ -157,38 +181,45 @@ type Config struct {
 	Timeout    int //in seconds
 }
 
-func main() {
+func init(){
+	//Используем JSON формат для вывода
+	log.SetFormatter(&log.JSONFormatter{})
 
-	cfg := Config{
-		MaxDepth:   3,
-		MaxResults: 10,
-		MaxErrors:  5,
-		Url:        "https://telegram.org",
-		Timeout:    10,
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.DebugLevel)
+}
+
+
+
+func SearchDepthCrawler(maxDepth int) *crawler {
+	return &crawler{
+		searchDepth: maxDepth,
 	}
-	var cr Crawler
-	var r Requester
+}
 
-	r = NewRequester(time.Duration(cfg.Timeout) * time.Second)
-	cr = NewCrawler(r)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go cr.Scan(ctx, cfg.Url, cfg.MaxDepth) //Запускаем краулер в отдельной рутине
-	go processResult(ctx, cancel, cr, cfg) //Обрабатываем результаты в отдельной рутине
-
-	sigCh := make(chan os.Signal)        //Создаем канал для приема сигналов
-	signal.Notify(sigCh, syscall.SIGINT) //Подписываемся на сигнал SIGINT
+func SigDepth(ctx context.Context, c *crawler, d int) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGUSR1)
 	for {
 		select {
-		case <-ctx.Done(): //Если всё завершили - выходим
+		case <-ctx.Done():
 			return
-		case <-sigCh:
-			cancel() //Если пришёл сигнал SigInt - завершаем контекст
+		case <-sigChan:
+			log.WithFields(log.Fields{
+				"SIGUSR1": <-sigChan,
+			}).Info("Depth += 2")
+			c.InitDepth(d)
 		}
 	}
 }
 
-func processResult(ctx context.Context, cancel func(), cr Crawler, cfg Config) {
+func (c *crawler) InitDepth(dep int) {
+	c.mu.Lock()
+	c.searchDepth += dep
+	c.mu.Unlock()
+}
+
+func ProcessResult(ctx context.Context, cancel func(), cr Crawler, cfg Config){
 	var maxResult, maxErrors = cfg.MaxResults, cfg.MaxErrors
 	for {
 		select {
