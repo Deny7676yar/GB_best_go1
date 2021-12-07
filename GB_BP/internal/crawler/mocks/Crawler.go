@@ -2,10 +2,9 @@
 
 package mocks
 
-import (
-	context "context"
-	"github.com/Deny7676yar/Go_level2/GB_BP/internal/crawler"
-)
+import context "context"
+
+import crawlerer "github.com/Deny7676yar/Go_level2/GB_BP/internal/controllers/crawlerer"
 import mock "github.com/stretchr/testify/mock"
 import sync "sync"
 
@@ -15,15 +14,15 @@ type Crawler struct {
 }
 
 // ChanResult provides a mock function with given fields:
-func (_m *Crawler) ChanResult() <-chan crawler.CrawlResult {
+func (_m *Crawler) ChanResult() <-chan crawlerer.CrawlResult {
 	ret := _m.Called()
 
-	var r0 <-chan crawler.CrawlResult
-	if rf, ok := ret.Get(0).(func() <-chan crawler.CrawlResult); ok {
+	var r0 <-chan crawlerer.CrawlResult
+	if rf, ok := ret.Get(0).(func() <-chan crawlerer.CrawlResult); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan crawler.CrawlResult)
+			r0 = ret.Get(0).(<-chan crawlerer.CrawlResult)
 		}
 	}
 

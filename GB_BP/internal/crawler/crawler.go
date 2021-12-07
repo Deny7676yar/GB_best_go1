@@ -7,8 +7,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/Deny7676yar/Go_level2/GB_BP/internal/services"
-
 	cfg "github.com/Deny7676yar/Go_level2/GB_BP/internal/config"
 	cra "github.com/Deny7676yar/Go_level2/GB_BP/internal/controllers/crawlerer"
 	log "github.com/sirupsen/logrus"
@@ -21,14 +19,14 @@ type Crawler interface {
 }
 
 type crawler struct {
-	r           services.Requester
+	r           cra.Requester
 	res         chan cra.CrawlResult
 	visited     map[string]struct{}
 	mu          sync.RWMutex
 	searchDepth int
 }
 
-func NewCrawler(r services.Requester) *crawler {
+func NewCrawler(r cra.Requester) *crawler {
 	return &crawler{
 		r:       r,
 		res:     make(chan cra.CrawlResult),

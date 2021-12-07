@@ -2,16 +2,16 @@ package services
 
 import (
 	"context"
+	"github.com/Deny7676yar/Go_level2/GB_BP/internal/page"
 	"net/http"
 	"time"
 
-	"github.com/Deny7676yar/Go_level2/GB_BP/internal/page"
-
+	cra "github.com/Deny7676yar/Go_level2/GB_BP/internal/controllers/crawlerer"
 	log "github.com/sirupsen/logrus"
 )
 
 type Requester interface {
-	Get(ctx context.Context, url string) (page.Page, error)
+	Get(ctx context.Context, url string) (cra.Page, error)
 }
 
 type requester struct {
@@ -22,7 +22,7 @@ func NewRequester(timeout time.Duration) requester {
 	return requester{timeout: timeout}
 }
 
-func (r requester) Get(ctx context.Context, url string) (page.Page, error) {
+func (r requester) Get(ctx context.Context, url string) (cra.Page, error) {
 	select {
 	case <-ctx.Done():
 		return nil, nil

@@ -14,7 +14,6 @@ import (
 )
 
 func main() {
-
 	//Используем JSON формат для вывода
 	log.SetFormatter(&log.JSONFormatter{})
 
@@ -51,7 +50,7 @@ func main() {
 		"New Crawler": cr,
 	}).Debug()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(cfg.Timeout))//общий таймаут в секундах
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(cfg.Timeout)) //общий таймаут в секундах
 
 	go cr.Scan(ctx, wg, cfg.URL, cfg.MaxDepth) //Запускаем краулер в отдельной рутине
 	wg.Wait()
@@ -64,7 +63,7 @@ func main() {
 	crawler := crawler2.SearchDepthCrawler(cfg.MaxDepth)
 	go crawler2.SigDepth(ctx, crawler, 2)
 
-	sigCh := make(chan os.Signal, 1)        //Создаем канал для приема сигналов
+	sigCh := make(chan os.Signal, 1)     //Создаем канал для приема сигналов
 	signal.Notify(sigCh, syscall.SIGINT) //Подписываемся на сигнал SIGINT
 
 	for {
@@ -79,4 +78,3 @@ func main() {
 		}
 	}
 }
-
