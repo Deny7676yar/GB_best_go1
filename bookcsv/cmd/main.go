@@ -1,88 +1,113 @@
 package main
 
+//Приложение запускается с аргументами командной строки
+//Введите при запуске go run main: insert|delete|search|select <arguments>
+
 import (
 	"context"
 	"fmt"
-	"github.com/Deny7676yar/Go_level2/bookcsv/internal/config"
-	"github.com/Deny7676yar/Go_level2/bookcsv/internal/controllers"
-	"github.com/Deny7676yar/Go_level2/bookcsv/internal/queryfile"
-	"github.com/Deny7676yar/Go_level2/bookcsv/internal/readerfile"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/Deny7676yar/Go_level2/bookcsv/internal/config"
+	"github.com/Deny7676yar/Go_level2/bookcsv/internal/queryfile"
+	"github.com/Deny7676yar/Go_level2/bookcsv/internal/readerfile"
+
+	log "github.com/sirupsen/logrus"
 )
 
-
 func main() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.DebugLevel)
 
+	log.WithFields(log.Fields{
+		"Start program": time.Now(),
+	}).Info()
 
 	cfg := config.Config{
-		PathFile: readerfile.CSVFILEinput,
-		Timeout:  100,
+		PathFile: queryfile.CSVFILEinput,
+		Timeout:  2,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(cfg.Timeout))
+	var r readerfile.CSVReaderer
+	var q queryfile.CSVQueryre
 
-	var cr readerfile.CSVReaderer
-	resultArray, err := cr.ReadCSVFile(ctx, readerfile.CSVFILEinput)
+	q = queryfile.NewCSVQuery(time.Duration(cfg.Timeout) * time.Second)
+	log.WithFields(log.Fields{
+		"New CSV query": q,
+	}).Debug()
+
+	r = readerfile.NewReaderCSV(q)
+	log.WithFields(log.Fields{
+		"New Reader": r,
+	}).Debug()
+
+	resultArray, err := r.ReadCSVFile(ctx, cfg.PathFile)
 	if err != nil {
-		log.Printf("reade error: %v\n", err)
+		log.WithFields(log.Fields{
+			"reader error:": err,
+		}).Errorf("Do not read file")
 	}
+
 	arguments := os.Args
 	if len(arguments) == 1 {
 		fmt.Println("Usage: insert|delete|search|select <arguments>")
 		return
 	}
 
-	fileInfo, err := os.Stat(cfg.PathFile)
-	// Is it a regular file?
-	mode := fileInfo.Mode()
-	if !mode.IsRegular() {
-		fmt.Println(cfg.PathFile, "not a regular file!")
+	err = queryfile.CreateIndex(resultArray)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"Create index error:": err,
+		}).Errorf("Cannot create index.")
 		return
 	}
 
-	var control controllers.Controller
-	err = control.CreateIndex(resultArray)
-	if err != nil {
-		fmt.Println("Cannot create index.")
-		return
-	}
-	var cq queryfile.CSVQueryre
-	// Differentiating between the commands
 	switch arguments[1] {
 	case "insert":
 		if len(arguments) != 5 {
-			fmt.Println("Usage: insert Name Surname Telephone")
+			log.WithFields(log.Fields{
+				"Insert error:": err,
+			}).Errorf("Usage: insert Name Surname Telephone.")
 			return
 		}
 		t := strings.ReplaceAll(arguments[4], "-", "")
-		if !control.MatchTel(t) {
-			fmt.Println("Not a valid telephone number:", t)
+		if !queryfile.MatchTel(t) {
+			log.WithFields(log.Fields{
+				"Insert error:": err,
+			}).Errorf("Error: %v, Not a valid telephone number: %s", err, t)
 			return
 		}
-		temp := control.InitS(arguments[2], arguments[3], t)
+		temp := queryfile.InitS(arguments[2], arguments[3], t)
 		if temp != nil {
-			err := cq.Insert(temp, resultArray)
+			err := q.Insert(ctx, temp, resultArray)
 			if err != nil {
-				fmt.Println(err)
+				log.WithFields(log.Fields{
+					"Inits error:": err,
+				}).Errorf("Error: %v", err)
 				return
 			}
 		}
 	case "delete":
 		if len(arguments) != 3 {
-			fmt.Println("Usage: delete Number")
+			log.WithFields(log.Fields{
+				"Inits error:": err,
+			}).Errorf("Usage: delete Number")
 			return
 		}
 		t := strings.ReplaceAll(arguments[2], "-", "")
-		if !control.MatchTel(t) {
-			fmt.Println("Not a valid telephone number:", t)
+		if !queryfile.MatchTel(t) {
+			log.WithFields(log.Fields{
+				"Delete error:": err,
+			}).Errorf("Error: %v, Not a valid telephone number: %s", err, t)
 			return
 		}
-		err := cq.DeleteEntry(t, resultArray)
+		err := q.DeleteEntry(ctx, t, resultArray)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -92,30 +117,38 @@ func main() {
 			return
 		}
 		t := strings.ReplaceAll(arguments[2], "-", "")
-		if !control.MatchTel(t) {
-			fmt.Println("Not a valid telephone number:", t)
+		if !queryfile.MatchTel(t) {
+			log.WithFields(log.Fields{
+				"Search error:": err,
+			}).Errorf("Error: %v, Not a valid telephone number: %s", err, t)
 			return
 		}
-		temp := cq.Search(t, resultArray)
+		temp := q.Search(ctx, t, resultArray)
 		if temp == nil {
-			fmt.Println("Number not found:", t)
+			log.WithFields(log.Fields{
+			}).Errorf("Number not found: %s", t)
 			return
 		}
 		fmt.Println(*temp)
 	case "select":
-		cq.Select(resultArray)
+		q.Select(ctx, resultArray)
 	default:
-		fmt.Println("Not a valid option")
+		log.WithFields(log.Fields{
+			"Not a valid option": "err",
+		}).Debug()
 	}
 
-	sigCh := make(chan os.Signal)
+	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT)
 	for {
 		select {
-		case <-ctx.Done():
-			return
 		case <-sigCh:
 			cancel()
+			log.WithFields(log.Fields{
+				"SIGINT": <-sigCh,
+			}).Info("cencel context")
+		case <-ctx.Done():
+			return
 		}
 	}
 }

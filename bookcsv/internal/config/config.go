@@ -4,7 +4,7 @@ package config
 
 type Config struct {
 	PathFile string
-	Timeout int
+	Timeout  int
 }
 
 //func NewConfigFilePath(c *Config) *Config{

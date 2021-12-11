@@ -1,0 +1,12 @@
+repos:
+  -   repo: https://github.com/dnephin/pre-commit-golang
+      rev: master
+      hooks:
+        -   id: go-unit-tests
+  -   repo: local
+      hooks:
+        - id: lint
+          name: golangci-lint
+          entry: "bash golang-lint.sh"
+          language: system
+          verbose: tru

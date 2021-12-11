@@ -6,33 +6,32 @@ import (
 	"log"
 	"os"
 	"sync"
+
+	"github.com/Deny7676yar/Go_level2/bookcsv/internal/queryfile"
 )
 
-var CSVFILEinput = "/home/den/Go_level2/bookcsv/internal/readfile/MOCK_DATA.csv"
-
-type Entry struct {
-	Name       string
-	Surname    string
-	Tel        string
-	LastAccess string
-}
-
 type CSVReaderer interface {
-	ReadCSVFile(ctx context.Context,  filepath string)([]Entry, error)
+	ReadCSVFile(ctx context.Context, filepath string) ([]queryfile.Entry, error)
 }
 
 type ReaderCSV struct {
-	r CSVReaderer
-	resChan chan Entry
-	pathCSV string
-	resultArray []Entry
-	mu sync.RWMutex
-	wg *sync.WaitGroup
+	q           queryfile.CSVQueryre
+	chanPlaces  chan queryfile.Entry
+	resultArray []queryfile.Entry
+	mu          sync.RWMutex
 }
 
+func NewReaderCSV(q queryfile.CSVQueryre) *ReaderCSV {
+	return &ReaderCSV{
+		q:           q,
+		chanPlaces:  make(chan queryfile.Entry),
+		resultArray: []queryfile.Entry{},
+		mu:          sync.RWMutex{},
+	}
+}
 
-
-func (r *ReaderCSV)ReadCSVFile(ctx context.Context,  filepath string)([]Entry, error){
+func (r *ReaderCSV) ReadCSVFile(ctx context.Context, filepath string) ([]queryfile.Entry, error) {
+	var wg = &sync.WaitGroup{}
 
 	_, err := os.Stat(filepath)
 	if err != nil {
@@ -43,22 +42,22 @@ func (r *ReaderCSV)ReadCSVFile(ctx context.Context,  filepath string)([]Entry, e
 	case <-ctx.Done():
 		return nil, err
 	default:
-		r.wg.Add(1)
-		go r.worker(filepath, r.resChan)
+		wg.Add(1)
+		go worker(filepath, r.chanPlaces, wg)
 	}
 	go func() {
-		for data := range r.resChan{
+		for data := range r.chanPlaces {
 			r.resultArray = append(r.resultArray, data)
 		}
 	}()
 
-	r.wg.Wait()
+	wg.Wait()
 
 	return r.resultArray, nil
 }
 
-func (r *ReaderCSV)worker(filePath string, resChan chan Entry) {
-	defer r.wg.Done()
+func worker(filePath string, resChan chan queryfile.Entry, wg *sync.WaitGroup) {
+	defer wg.Done()
 
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -70,8 +69,8 @@ func (r *ReaderCSV)worker(filePath string, resChan chan Entry) {
 	if err != nil {
 		log.Fatalf("read csv error: %v\n", err)
 	}
-	for _, line := range lines{
-		data := Entry{
+	for _, line := range lines {
+		data := queryfile.Entry{
 			Name:       line[0],
 			Surname:    line[1],
 			Tel:        line[2],
